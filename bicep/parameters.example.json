@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westeurope"
+    },
+    "environmentName": {
+      "value": "env-eureka-crawler"
+    },
+    "uamiName": {
+      "value": "uami-eureka-crawler"
+    },
+    "keyVaultName": {
+      "value": "kv-eureka-example"
+    },
+    "jobBackfillName": {
+      "value": "eureka-backfill"
+    },
+    "jobDeltaName": {
+      "value": "eureka-delta"
+    },
+    "containerImage": {
+      "value": "myregistry.azurecr.io/eureka-crawler:latest"
+    },
+    "registryServer": {
+      "value": "myregistry.azurecr.io"
+    },
+    "registryUsername": {
+      "value": "myregistry"
+    },
+    "registryPassword": {
+      "value": "YOUR-REGISTRY-PASSWORD-OR-PAT"
+    },
+    "cosmosAccountName": {
+      "value": "cosmos-eureka-unique123"
+    },
+    "devUserObjectId": {
+      "value": "REPLACE-WITH-DEV-USER-OBJECT-ID"
+    },
+    "sharePointTenantId": {
+      "value": "YOUR-TENANT-ID"
+    },
+    "sharePointClientId": {
+      "value": "YOUR-CLIENT-ID"
+    },
+    "sharePointClientSecret": {
+      "value": "YOUR-CLIENT-SECRET"
+    },
+    "sharePointSiteId": {
+      "value": "YOUR-SITE-ID"
+    },
+    "sharePointDriveId": {
+      "value": "YOUR-DRIVE-ID"
+    },
+    "cpu": {
+      "value": "0.5"
+    },
+    "memory": {
+      "value": "1Gi"
+    },
+    "cronExpression": {
+      "value": "10 4 * * *"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+# Rendered files (generated dynamically)
+**/rendered*.yaml
+**/rendered*.json
+*.rendered.*
+
+# Secrets (safety)
+*.secret
+*.key
+*.pem
+*.pfx
+secrets/
+
+# Local configuration
+.env
+.env.local
+*.local.json
+parameters.json
+
+# IDE
+.idea/
+.vscode/
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Bicep compiled (regenerate on demand)
+# bicep/*.json

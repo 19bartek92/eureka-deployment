@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+CLAUDE.md
+DEPLOYMENT_SUMMARY.md
+
+# Deployment artifacts
+ops/
+.claude/
+
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+out/
+publish/
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development files
+appsettings.Development.json
+*.user
+*.suo
+
+# Test results
+TestResults/
+*.trx
+
+# Logs
+*.log
+logs/

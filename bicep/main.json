@@ -1,0 +1,641 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.5.1644",
+      "templateHash": "4200021292502394846"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources"
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "defaultValue": "env-eureka-crawler",
+      "metadata": {
+        "description": "Name of the Container Apps Environment"
+      }
+    },
+    "uamiName": {
+      "type": "string",
+      "defaultValue": "uami-eureka-crawler",
+      "metadata": {
+        "description": "Name of the User-Assigned Managed Identity"
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "defaultValue": "[format('kv-eureka-{0}', uniqueString(resourceGroup().id))]",
+      "metadata": {
+        "description": "Name of the Azure Key Vault (must be globally unique)"
+      }
+    },
+    "jobBackfillName": {
+      "type": "string",
+      "defaultValue": "eureka-backfill",
+      "metadata": {
+        "description": "Name of the backfill job"
+      }
+    },
+    "jobDeltaName": {
+      "type": "string",
+      "defaultValue": "eureka-delta",
+      "metadata": {
+        "description": "Name of the delta job"
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "metadata": {
+        "description": "Container image for Eureka Crawler"
+      }
+    },
+    "registryServer": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Container registry server (e.g., myregistry.azurecr.io)"
+      }
+    },
+    "registryUsername": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Container registry username"
+      }
+    },
+    "registryPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Container registry password"
+      }
+    },
+    "cosmosAccountName": {
+      "type": "string",
+      "defaultValue": "[format('cosmos-eureka-{0}', uniqueString(resourceGroup().id))]",
+      "minLength": 3,
+      "maxLength": 44,
+      "metadata": {
+        "description": "Name of the Cosmos DB account (must be globally unique)"
+      }
+    },
+    "devUserObjectId": {
+      "type": "string",
+      "metadata": {
+        "hint": "Get via: az ad user show --id bartoszpalmi@hotmail.com --query id -o tsv",
+        "description": "Azure AD Object ID of developer user for Contributor access"
+      }
+    },
+    "sharePointTenantId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SharePoint Tenant ID"
+      }
+    },
+    "sharePointClientId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SharePoint Client ID"
+      }
+    },
+    "sharePointClientSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SharePoint Client Secret"
+      }
+    },
+    "sharePointSiteId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SharePoint Site ID"
+      }
+    },
+    "sharePointDriveId": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SharePoint Drive ID"
+      }
+    },
+    "cpu": {
+      "type": "string",
+      "defaultValue": "0.5",
+      "metadata": {
+        "description": "CPU cores for job containers"
+      }
+    },
+    "memory": {
+      "type": "string",
+      "defaultValue": "1Gi",
+      "metadata": {
+        "description": "Memory for job containers"
+      }
+    },
+    "cronExpression": {
+      "type": "string",
+      "defaultValue": "10 4 * * *",
+      "metadata": {
+        "description": "CRON expression for delta job schedule (UTC timezone)"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[parameters('uamiName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "tenantId": "[subscription().tenantId]",
+        "enableRbacAuthorization": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 90,
+        "enabledForDeployment": false,
+        "enabledForDiskEncryption": false,
+        "enabledForTemplateDeployment": false,
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.KeyVault/vaults/{0}', parameters('keyVaultName'))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'Key Vault Secrets User')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2023-11-15",
+      "name": "[parameters('cosmosAccountName')]",
+      "location": "[parameters('location')]",
+      "kind": "MongoDB",
+      "properties": {
+        "databaseAccountOfferType": "Standard",
+        "enableFreeTier": false,
+        "capabilities": [
+          {
+            "name": "EnableServerless"
+          },
+          {
+            "name": "EnableMongo"
+          }
+        ],
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0,
+            "isZoneRedundant": false
+          }
+        ],
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session"
+        },
+        "apiProperties": {
+          "serverVersion": "4.2"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases",
+      "apiVersion": "2023-11-15",
+      "name": "[format('{0}/{1}', parameters('cosmosAccountName'), 'eureka')]",
+      "properties": {
+        "resource": {
+          "id": "eureka"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'cosmos-connection-string')]",
+      "properties": {
+        "value": "[format('mongodb://{0}:{1}@{2}.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000', parameters('cosmosAccountName'), listKeys(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName')), '2023-11-15').primaryMasterKey, parameters('cosmosAccountName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName'))]",
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', parameters('cosmosAccountName'), 'eureka')]",
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'sharepoint-tenant-id')]",
+      "properties": {
+        "value": "[parameters('sharePointTenantId')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'sharepoint-client-id')]",
+      "properties": {
+        "value": "[parameters('sharePointClientId')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'sharepoint-client-secret')]",
+      "properties": {
+        "value": "[parameters('sharePointClientSecret')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'sharepoint-site-id')]",
+      "properties": {
+        "value": "[parameters('sharePointSiteId')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'sharepoint-drive-id')]",
+      "properties": {
+        "value": "[parameters('sharePointDriveId')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('environmentName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.App/jobs",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('jobBackfillName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))]": {}
+        }
+      },
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "configuration": {
+          "triggerType": "Manual",
+          "replicaTimeout": 86400,
+          "replicaRetryLimit": 3,
+          "manualTriggerConfig": {
+            "parallelism": 1,
+            "replicaCompletionCount": 1
+          },
+          "registries": "[if(not(empty(parameters('registryServer'))), createArray(createObject('server', parameters('registryServer'), 'username', parameters('registryUsername'), 'passwordSecretRef', 'registry-password')), createArray())]",
+          "secrets": "[concat(createArray(createObject('name', 'cosmos-connection-string', 'keyVaultUrl', format('{0}secrets/cosmos-connection-string', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-tenant-id', 'keyVaultUrl', format('{0}secrets/sharepoint-tenant-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-id', 'keyVaultUrl', format('{0}secrets/sharepoint-client-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-secret', 'keyVaultUrl', format('{0}secrets/sharepoint-client-secret', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-site-id', 'keyVaultUrl', format('{0}secrets/sharepoint-site-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-drive-id', 'keyVaultUrl', format('{0}secrets/sharepoint-drive-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))), if(not(empty(parameters('registryPassword'))), createArray(createObject('name', 'registry-password', 'value', parameters('registryPassword'))), createArray()))]"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "eureka-crawler-backfill",
+              "image": "[parameters('containerImage')]",
+              "resources": {
+                "cpu": "[json(parameters('cpu'))]",
+                "memory": "[parameters('memory')]"
+              },
+              "env": [
+                {
+                  "name": "MODE",
+                  "value": "backfill"
+                },
+                {
+                  "name": "Eureka__BaseUrl",
+                  "value": "https://eureka.mf.gov.pl/api/public/v1/"
+                },
+                {
+                  "name": "Eureka__PageSize",
+                  "value": "100"
+                },
+                {
+                  "name": "Eureka__Category",
+                  "value": "1"
+                },
+                {
+                  "name": "Eureka__Limits__SearchRpm",
+                  "value": "10"
+                },
+                {
+                  "name": "Eureka__Limits__InfoRpm",
+                  "value": "25"
+                },
+                {
+                  "name": "Eureka__Limits__AllRpm",
+                  "value": "40"
+                },
+                {
+                  "name": "Eureka__Limits__ReqPerHour",
+                  "value": "300"
+                },
+                {
+                  "name": "Cosmos__Database",
+                  "value": "eureka"
+                },
+                {
+                  "name": "Cosmos__Collection",
+                  "value": "informations"
+                },
+                {
+                  "name": "Cosmos__CreateIndexesOnStart",
+                  "value": "true"
+                },
+                {
+                  "name": "Cosmos__ConnectionString",
+                  "secretRef": "cosmos-connection-string"
+                },
+                {
+                  "name": "SharePoint__FolderFormat",
+                  "value": "yyyyMM"
+                },
+                {
+                  "name": "SharePoint__TenantId",
+                  "secretRef": "sharepoint-tenant-id"
+                },
+                {
+                  "name": "SharePoint__ClientId",
+                  "secretRef": "sharepoint-client-id"
+                },
+                {
+                  "name": "SharePoint__ClientSecret",
+                  "secretRef": "sharepoint-client-secret"
+                },
+                {
+                  "name": "SharePoint__SiteId",
+                  "secretRef": "sharepoint-site-id"
+                },
+                {
+                  "name": "SharePoint__DriveId",
+                  "secretRef": "sharepoint-drive-id"
+                },
+                {
+                  "name": "Logging__LogLevel__Default",
+                  "value": "Information"
+                },
+                {
+                  "name": "Logging__LogLevel__Microsoft.Hosting.Lifetime",
+                  "value": "Information"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+        "[extensionResourceId(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'Key Vault Secrets User'))]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'cosmos-connection-string')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-client-id')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-client-secret')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-drive-id')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-site-id')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-tenant-id')]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.App/jobs",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('jobDeltaName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))]": {}
+        }
+      },
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "configuration": {
+          "triggerType": "Schedule",
+          "replicaTimeout": 3600,
+          "replicaRetryLimit": 2,
+          "scheduleTriggerConfig": {
+            "cronExpression": "[parameters('cronExpression')]",
+            "parallelism": 1,
+            "replicaCompletionCount": 1
+          },
+          "registries": "[if(not(empty(parameters('registryServer'))), createArray(createObject('server', parameters('registryServer'), 'username', parameters('registryUsername'), 'passwordSecretRef', 'registry-password')), createArray())]",
+          "secrets": "[concat(createArray(createObject('name', 'cosmos-connection-string', 'keyVaultUrl', format('{0}secrets/cosmos-connection-string', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-tenant-id', 'keyVaultUrl', format('{0}secrets/sharepoint-tenant-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-id', 'keyVaultUrl', format('{0}secrets/sharepoint-client-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-secret', 'keyVaultUrl', format('{0}secrets/sharepoint-client-secret', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-site-id', 'keyVaultUrl', format('{0}secrets/sharepoint-site-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-drive-id', 'keyVaultUrl', format('{0}secrets/sharepoint-drive-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))), if(not(empty(parameters('registryPassword'))), createArray(createObject('name', 'registry-password', 'value', parameters('registryPassword'))), createArray()))]"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "eureka-crawler-delta",
+              "image": "[parameters('containerImage')]",
+              "resources": {
+                "cpu": "[json(parameters('cpu'))]",
+                "memory": "[parameters('memory')]"
+              },
+              "env": [
+                {
+                  "name": "MODE",
+                  "value": "delta"
+                },
+                {
+                  "name": "Eureka__BaseUrl",
+                  "value": "https://eureka.mf.gov.pl/api/public/v1/"
+                },
+                {
+                  "name": "Eureka__PageSize",
+                  "value": "100"
+                },
+                {
+                  "name": "Eureka__Category",
+                  "value": "1"
+                },
+                {
+                  "name": "Eureka__Limits__SearchRpm",
+                  "value": "10"
+                },
+                {
+                  "name": "Eureka__Limits__InfoRpm",
+                  "value": "25"
+                },
+                {
+                  "name": "Eureka__Limits__AllRpm",
+                  "value": "40"
+                },
+                {
+                  "name": "Eureka__Limits__ReqPerHour",
+                  "value": "300"
+                },
+                {
+                  "name": "Cosmos__Database",
+                  "value": "eureka"
+                },
+                {
+                  "name": "Cosmos__Collection",
+                  "value": "informations"
+                },
+                {
+                  "name": "Cosmos__CreateIndexesOnStart",
+                  "value": "true"
+                },
+                {
+                  "name": "Cosmos__ConnectionString",
+                  "secretRef": "cosmos-connection-string"
+                },
+                {
+                  "name": "SharePoint__FolderFormat",
+                  "value": "yyyyMM"
+                },
+                {
+                  "name": "SharePoint__TenantId",
+                  "secretRef": "sharepoint-tenant-id"
+                },
+                {
+                  "name": "SharePoint__ClientId",
+                  "secretRef": "sharepoint-client-id"
+                },
+                {
+                  "name": "SharePoint__ClientSecret",
+                  "secretRef": "sharepoint-client-secret"
+                },
+                {
+                  "name": "SharePoint__SiteId",
+                  "secretRef": "sharepoint-site-id"
+                },
+                {
+                  "name": "SharePoint__DriveId",
+                  "secretRef": "sharepoint-drive-id"
+                },
+                {
+                  "name": "Logging__LogLevel__Default",
+                  "value": "Information"
+                },
+                {
+                  "name": "Logging__LogLevel__Microsoft.Hosting.Lifetime",
+                  "value": "Information"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+        "[extensionResourceId(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'Key Vault Secrets User'))]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'cosmos-connection-string')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-client-id')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-client-secret')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-drive-id')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-site-id')]",
+        "[resourceId('Microsoft.KeyVault/vaults/secrets', parameters('keyVaultName'), 'sharepoint-tenant-id')]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceGroup().id, parameters('devUserObjectId'), 'Contributor')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+        "principalId": "[parameters('devUserObjectId')]",
+        "principalType": "User"
+      }
+    }
+  ],
+  "outputs": {
+    "environmentId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"
+    },
+    "uamiId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+    },
+    "uamiPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), '2023-01-31').principalId]"
+    },
+    "uamiClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), '2023-01-31').clientId]"
+    },
+    "keyVaultId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+    },
+    "keyVaultUri": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri]"
+    },
+    "jobBackfillName": {
+      "type": "string",
+      "value": "[parameters('jobBackfillName')]"
+    },
+    "jobDeltaName": {
+      "type": "string",
+      "value": "[parameters('jobDeltaName')]"
+    },
+    "cosmosAccountName": {
+      "type": "string",
+      "value": "[parameters('cosmosAccountName')]"
+    },
+    "cosmosEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('cosmosAccountName')), '2023-11-15').documentEndpoint]"
+    },
+    "cosmosDatabaseName": {
+      "type": "string",
+      "value": "eureka"
+    },
+    "devUserAccessGranted": {
+      "type": "string",
+      "value": "[format('Contributor role assigned to {0}', parameters('devUserObjectId'))]"
+    }
+  }
+}
