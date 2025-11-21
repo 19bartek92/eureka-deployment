@@ -228,11 +228,7 @@ resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
 resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: environmentName
   location: location
-  properties: {
-    appLogsConfiguration: {
-      destination: 'log-analytics'
-    }
-  }
+  properties: {}
 }
 
 // Container Apps Job - Backfill (Manual Trigger)

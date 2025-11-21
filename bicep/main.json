@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.38.5.1644",
-      "templateHash": "17229849334355029405"
+      "templateHash": "720140842658434480"
     }
   },
   "parameters": {
@@ -331,11 +331,7 @@
       "apiVersion": "2023-05-01",
       "name": "[parameters('environmentName')]",
       "location": "[parameters('location')]",
-      "properties": {
-        "appLogsConfiguration": {
-          "destination": "log-analytics"
-        }
-      }
+      "properties": {}
     },
     {
       "type": "Microsoft.App/jobs",
