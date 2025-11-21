@@ -20,17 +20,14 @@
     "jobDeltaName": {
       "value": "eureka-delta"
     },
-    "containerImage": {
-      "value": "myregistry.azurecr.io/eureka-crawler:latest"
+    "acrName": {
+      "value": "acreureka"
     },
-    "registryServer": {
-      "value": "myregistry.azurecr.io"
+    "imageName": {
+      "value": "eureka-crawler"
     },
-    "registryUsername": {
-      "value": "myregistry"
-    },
-    "registryPassword": {
-      "value": "YOUR-REGISTRY-PASSWORD-OR-PAT"
+    "imageTag": {
+      "value": "latest"
     },
     "cosmosAccountName": {
       "value": "cosmos-eureka-unique123"

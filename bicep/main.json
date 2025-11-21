@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.38.5.1644",
-      "templateHash": "4200021292502394846"
+      "templateHash": "17229849334355029405"
     }
   },
   "parameters": {
@@ -51,31 +51,27 @@
         "description": "Name of the delta job"
       }
     },
-    "containerImage": {
+    "acrName": {
       "type": "string",
+      "defaultValue": "[format('acr{0}', uniqueString(resourceGroup().id))]",
+      "minLength": 5,
+      "maxLength": 50,
       "metadata": {
-        "description": "Container image for Eureka Crawler"
+        "description": "Name of the Azure Container Registry (must be globally unique, 5-50 alphanumeric characters)"
       }
     },
-    "registryServer": {
+    "imageName": {
       "type": "string",
-      "defaultValue": "",
+      "defaultValue": "eureka-crawler",
       "metadata": {
-        "description": "Container registry server (e.g., myregistry.azurecr.io)"
+        "description": "Container image name in ACR"
       }
     },
-    "registryUsername": {
+    "imageTag": {
       "type": "string",
-      "defaultValue": "",
+      "defaultValue": "latest",
       "metadata": {
-        "description": "Container registry username"
-      }
-    },
-    "registryPassword": {
-      "type": "securestring",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Container registry password"
+        "description": "Container image tag"
       }
     },
     "cosmosAccountName": {
@@ -302,6 +298,35 @@
       ]
     },
     {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('acrName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "adminUserEnabled": false,
+        "publicNetworkAccess": "Enabled",
+        "zoneRedundancy": "Disabled"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', parameters('acrName'))]",
+      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'AcrPull')]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+      ]
+    },
+    {
       "type": "Microsoft.App/managedEnvironments",
       "apiVersion": "2023-05-01",
       "name": "[parameters('environmentName')]",
@@ -333,14 +358,50 @@
             "parallelism": 1,
             "replicaCompletionCount": 1
           },
-          "registries": "[if(not(empty(parameters('registryServer'))), createArray(createObject('server', parameters('registryServer'), 'username', parameters('registryUsername'), 'passwordSecretRef', 'registry-password')), createArray())]",
-          "secrets": "[concat(createArray(createObject('name', 'cosmos-connection-string', 'keyVaultUrl', format('{0}secrets/cosmos-connection-string', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-tenant-id', 'keyVaultUrl', format('{0}secrets/sharepoint-tenant-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-id', 'keyVaultUrl', format('{0}secrets/sharepoint-client-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-secret', 'keyVaultUrl', format('{0}secrets/sharepoint-client-secret', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-site-id', 'keyVaultUrl', format('{0}secrets/sharepoint-site-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-drive-id', 'keyVaultUrl', format('{0}secrets/sharepoint-drive-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))), if(not(empty(parameters('registryPassword'))), createArray(createObject('name', 'registry-password', 'value', parameters('registryPassword'))), createArray()))]"
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "cosmos-connection-string",
+              "keyVaultUrl": "[format('{0}secrets/cosmos-connection-string', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-tenant-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-tenant-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-client-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-client-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-client-secret",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-client-secret', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-site-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-site-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-drive-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-drive-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            }
+          ]
         },
         "template": {
           "containers": [
             {
               "name": "eureka-crawler-backfill",
-              "image": "[parameters('containerImage')]",
+              "image": "[format('{0}/{1}:{2}', reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'))]",
               "resources": {
                 "cpu": "[json(parameters('cpu'))]",
                 "memory": "[parameters('memory')]"
@@ -432,6 +493,8 @@
         }
       },
       "dependsOn": [
+        "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'AcrPull'))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
         "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
         "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
         "[extensionResourceId(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'Key Vault Secrets User'))]",
@@ -466,14 +529,50 @@
             "parallelism": 1,
             "replicaCompletionCount": 1
           },
-          "registries": "[if(not(empty(parameters('registryServer'))), createArray(createObject('server', parameters('registryServer'), 'username', parameters('registryUsername'), 'passwordSecretRef', 'registry-password')), createArray())]",
-          "secrets": "[concat(createArray(createObject('name', 'cosmos-connection-string', 'keyVaultUrl', format('{0}secrets/cosmos-connection-string', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-tenant-id', 'keyVaultUrl', format('{0}secrets/sharepoint-tenant-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-id', 'keyVaultUrl', format('{0}secrets/sharepoint-client-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-client-secret', 'keyVaultUrl', format('{0}secrets/sharepoint-client-secret', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-site-id', 'keyVaultUrl', format('{0}secrets/sharepoint-site-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))), createObject('name', 'sharepoint-drive-id', 'keyVaultUrl', format('{0}secrets/sharepoint-drive-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri), 'identity', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))), if(not(empty(parameters('registryPassword'))), createArray(createObject('name', 'registry-password', 'value', parameters('registryPassword'))), createArray()))]"
+          "registries": [
+            {
+              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "cosmos-connection-string",
+              "keyVaultUrl": "[format('{0}secrets/cosmos-connection-string', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-tenant-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-tenant-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-client-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-client-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-client-secret",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-client-secret', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-site-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-site-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            },
+            {
+              "name": "sharepoint-drive-id",
+              "keyVaultUrl": "[format('{0}secrets/sharepoint-drive-id', reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri)]",
+              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
+            }
+          ]
         },
         "template": {
           "containers": [
             {
               "name": "eureka-crawler-delta",
-              "image": "[parameters('containerImage')]",
+              "image": "[format('{0}/{1}:{2}', reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'))]",
               "resources": {
                 "cpu": "[json(parameters('cpu'))]",
                 "memory": "[parameters('memory')]"
@@ -565,6 +664,8 @@
         }
       },
       "dependsOn": [
+        "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'AcrPull'))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
         "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
         "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
         "[extensionResourceId(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'Key Vault Secrets User'))]",
@@ -636,6 +737,18 @@
     "devUserAccessGranted": {
       "type": "string",
       "value": "[format('Contributor role assigned to {0}', parameters('devUserObjectId'))]"
+    },
+    "acrName": {
+      "type": "string",
+      "value": "[parameters('acrName')]"
+    },
+    "acrLoginServer": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]"
+    },
+    "fullImageUrl": {
+      "type": "string",
+      "value": "[format('{0}/{1}:{2}', reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'))]"
     }
   }
 }

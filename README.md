@@ -1,133 +1,103 @@
-# Eureka.Crawler - Azure Deployment
+# Eureka.Crawler - Wdrożenie w Azure
 
-**One-click deployment** for Eureka.Crawler - a .NET 9.0 Worker Service that integrates with the public Eureka API (eureka.mf.gov.pl) to fetch and process Polish government legal documents.
+**Instalacja w jeden klik** dla aplikacji Eureka.Crawler - systemu pobierania dokumentów prawnych z eureka.mf.gov.pl.
 
-> **Note:** This repository contains **deployment artifacts only**. Application source code is maintained separately.
+> **Uwaga:** To repozytorium zawiera **tylko pliki deployment**. Kod aplikacji jest utrzymywany osobno.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fyour-username%2Feureka-deployment%2Fmain%2Fbicep%2Fmain.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2F19bartek92%2Feureka-deployment%2Fmain%2Fbicep%2Fmain.json)
 
 ---
 
-## What Gets Deployed?
+## Co zostanie wdrożone?
 
-Click the "Deploy to Azure" button above to create:
+Kliknij przycisk "Deploy to Azure" powyżej aby utworzyć:
 
-- ✅ **Resource Group** - container for all resources
-- ✅ **Azure Cosmos DB for MongoDB** - Serverless database (auto-created)
-  - Database: `eureka`
-  - Connection string automatically stored in Key Vault
-- ✅ **Container Apps Environment** - managed runtime for jobs
-- ✅ **User-Assigned Managed Identity (UAMI)** - passwordless authentication
-- ✅ **Azure Key Vault** - secure secrets storage (RBAC-based)
+- ✅ **Resource Group** - kontener dla wszystkich zasobów
+- ✅ **Azure Container Registry (ACR)** - Private registry dla obrazów Docker (~$5/miesiąc)
+  - UAMI automatic pull access (zero credentials potrzebnych)
+- ✅ **Azure Cosmos DB** - Baza danych MongoDB (automatycznie tworzona, Serverless)
+  - Connection string automatycznie w Key Vault
+- ✅ **Container Apps Environment** - środowisko uruchomieniowe dla jobów
+- ✅ **User-Assigned Managed Identity (UAMI)** - uwierzytelnianie bez haseł
+- ✅ **Azure Key Vault** - bezpieczne przechowywanie sekretów (RBAC)
 - ✅ **2 Container Apps Jobs**:
-  - `eureka-backfill` - manual trigger for full sync (24h timeout)
-  - `eureka-delta` - scheduled daily updates at 4:10 AM UTC (1h timeout)
-- ✅ **Developer Access** - `bartoszpalmi@hotmail.com` automatically granted **Contributor** role
+  - `eureka-backfill` - ręczne uruchamianie (pełna synchronizacja, 24h timeout)
+  - `eureka-delta` - codzienne aktualizacje o 4:10 UTC (1h timeout)
+- ✅ **Developer Access** - automatyczne nadanie roli **Contributor** dla developera
 
-**Deployment time:** ~10-15 minutes
+**Czas wdrożenia:** ~10-15 minut
 
 ---
 
-## Prerequisites
+## Wymagania wstępne
 
-Before clicking "Deploy to Azure", complete these steps:
+Przed kliknięciem "Deploy to Azure" wykonaj poniższe kroki:
 
-### 1. Azure Entra ID (App Registration)
+### 1. Azure Entra ID (App Registration dla SharePoint)
 
-Setup SharePoint authentication:
+Setup uwierzytelniania SharePoint:
 
-📖 **Full guide:** [docs/ENTRA_SETUP.md](docs/ENTRA_SETUP.md)
+📖 **Pełna instrukcja:** [docs/SETUP_ENTRA_ID.md](docs/SETUP_ENTRA_ID.md)
 
-**Quick steps:**
+**Skrócone kroki:**
 1. Azure Portal → Azure Active Directory → App registrations → New registration
-2. Name: `Eureka.Crawler.SharePoint`
-3. Create client secret
-4. Add API permissions: `Files.ReadWrite.All`, `Sites.ReadWrite.All`
-5. Grant admin consent
+2. Nazwa: `Eureka.Crawler.SharePoint`
+3. Utwórz client secret
+4. Dodaj uprawnienia API: `Files.ReadWrite.All`, `Sites.ReadWrite.All`
+5. Nadaj admin consent
 
-**You'll need:** Tenant ID, Client ID, Client Secret
+**Będziesz potrzebować:** Tenant ID, Client ID, Client Secret
 
-### 2. SharePoint (Site ID and Drive ID)
+### 2. SharePoint (Site ID i Drive ID)
 
-📖 **Full guide:** [docs/ENTRA_SETUP.md#finding-site-and-drive-ids](docs/ENTRA_SETUP.md#finding-site-and-drive-ids)
+📖 **Pełna instrukcja:** [docs/SETUP_SHAREPOINT.md](docs/SETUP_SHAREPOINT.md)
 
-**Quick method:** [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer)
+**Najszybsza metoda:** [Graph Explorer](https://developer.microsoft.com/graph/graph-explorer)
 ```
-GET https://graph.microsoft.com/v1.0/sites?search=YourSiteName
+GET https://graph.microsoft.com/v1.0/sites?search=NazwaTwojegoSite
 GET https://graph.microsoft.com/v1.0/sites/{siteId}/drives
 ```
 
-**You'll need:** Site ID, Drive ID
+**Będziesz potrzebować:** Site ID, Drive ID
 
-### 3. Developer Object ID (for automatic access)
+### 3. Developer Object ID
 
+**Otrzymasz od developera:**
+- Developer Object ID (format GUID)
+
+Developer wykona:
 ```bash
-az login
 az ad user show --id bartoszpalmi@hotmail.com --query id -o tsv
 ```
 
-**You'll need:** Developer Object ID (GUID format)
-
-### 4. Container Image
-
-Your pre-built Docker image URL (e.g., `yourregistry.azurecr.io/eureka-crawler:latest`)
-
-**You'll need:** Image URL, Registry credentials (username + password/PAT)
+**NIE MUSISZ** instalować Azure CLI ani szukać tego samodzielnie - developer dostarczy gotową wartość.
 
 ---
 
-## Deployment Parameters
+## Parametry deployment
 
-When you click "Deploy to Azure", fill in these parameters:
+Kiedy klikniesz "Deploy to Azure", wypełnij formularz:
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| **Resource Group** | New or existing RG | `rg-eureka-crawler` |
-| **Location** | Azure region | `West Europe` |
-| **Container Image** | Full image URL | `myregistry.azurecr.io/eureka-crawler:latest` |
-| **Registry Server** | Container registry URL | `myregistry.azurecr.io` |
-| **Registry Username** | Registry login | `myregistry` |
-| **Registry Password** | Registry PAT/password | `***` (secret) |
-| **SharePoint Tenant ID** | From Entra ID | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
-| **SharePoint Client ID** | From App Registration | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
-| **SharePoint Client Secret** | From App Registration | `***` (secret) |
-| **SharePoint Site ID** | From Graph Explorer | `contoso.sharepoint.com,xxx...` |
-| **SharePoint Drive ID** | From Graph Explorer | `b!xxx...` |
-| **Cosmos Account Name** | Globally unique name | `cosmos-eureka-abc123` |
-| **Developer Object ID** | Azure AD Object ID | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` |
+| Parametr | Opis | Przykład | Default |
+|----------|------|----------|---------|
+| **Resource Group** | Nowa lub istniejąca RG | `rg-eureka-crawler` | - |
+| **Location** | Region Azure | `West Europe` | - |
+| **ACR Name** | Nazwa Azure Container Registry | `acreureka` | `acr${uniqueString(...)}` |
+| **Image Name** | Nazwa obrazu Docker | `eureka-crawler` | `eureka-crawler` |
+| **Image Tag** | Tag obrazu | `latest` | `latest` |
+| **SharePoint Tenant ID** | Z Entra ID | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | - |
+| **SharePoint Client ID** | Z App Registration | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | - |
+| **SharePoint Client Secret** | Z App Registration | `***` (sekret) | - |
+| **SharePoint Site ID** | Z Graph Explorer | `contoso.sharepoint.com,xxx...` | - |
+| **SharePoint Drive ID** | Z Graph Explorer | `b!xxx...` | - |
+| **Cosmos Account Name** | Nazwa Cosmos DB | `cosmos-eureka-abc123` | `cosmos-eureka-${uniqueString(...)}` |
+| **Developer Object ID** | Od developera | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` | - |
 
----
-
-## After Deployment
-
-📖 **Full guide:** [docs/POST_DEPLOYMENT.md](docs/POST_DEPLOYMENT.md)
-
-### Quick verification:
-
-```bash
-# List created resources
-az resource list --resource-group rg-eureka-crawler --output table
-
-# Verify developer access
-az role assignment list \
-  --resource-group rg-eureka-crawler \
-  --query "[?principalType=='User']" --output table
-
-# Start first job
-az containerapp job start \
-  --name eureka-backfill \
-  --resource-group rg-eureka-crawler
-
-# Monitor logs
-az containerapp job logs show \
-  --name eureka-backfill \
-  --resource-group rg-eureka-crawler \
-  --follow
-```
+**Uwaga:** ACR Name, Image Name, Image Tag mają sensowne defaulty - możesz zostawić puste jeśli nie masz specjalnych wymagań.
 
 ---
 
-## Architecture
+## Architektura
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -135,7 +105,7 @@ az containerapp job logs show \
 │                                                          │
 │  ┌─────────────────┐        ┌─────────────────┐        │
 │  │ Backfill Job    │        │ Delta Job       │        │
-│  │ (Manual)        │        │ (CRON: 4:10 UTC)│        │
+│  │ (Ręczny)        │        │ (CRON: 4:10 UTC)│        │
 │  │ Timeout: 24h    │        │ Timeout: 1h     │        │
 │  └────────┬────────┘        └────────┬────────┘        │
 │           │                          │                  │
@@ -145,128 +115,114 @@ az containerapp job logs show \
 │              │ UAMI (Identity) │                        │
 │              │ - Key Vault     │                        │
 │              │ - Cosmos DB     │                        │
+│              │ - ACR Pull      │                        │
 │              └───────┬─────────┘                        │
 └──────────────────────┼──────────────────────────────────┘
                        │
-            ┌──────────▼───────────┐
-            │   Azure Key Vault    │
-            │  ┌─────────────────┐ │
-            │  │ cosmos-conn     │ │ ← Auto-generated
-            │  │ sp-tenant       │ │
-            │  │ sp-client-id    │ │
-            │  │ sp-client-secret│ │
-            │  │ sp-site         │ │
-            │  │ sp-drive        │ │
-            │  └─────────────────┘ │
-            └──────────────────────┘
-                       │
         ┌──────────────┼──────────────┐
         │              │              │
-   ┌────▼─────┐  ┌────▼────┐  ┌──────▼────────┐
-   │Cosmos DB │  │SharePoint│  │Eureka API     │
-   │(MongoDB) │  │(Graph)   │  │(Public)       │
-   │Serverless│  │          │  │               │
-   └──────────┘  └─────────┘  └───────────────┘
+  ┌─────▼─────┐ ┌──────▼───────┐     │
+  │   ACR     │ │  Key Vault   │     │
+  │ (Private) │ │  ┌─────────┐ │     │
+  │           │ │  │cosmos   │ │     │
+  │  Images:  │ │  │sp-*     │ │     │
+  │  latest   │ │  └─────────┘ │     │
+  └───────────┘ └──────────────┘     │
+                                     │
+        ┌────────────────────────────┘
+        │
+  ┌─────▼─────┐  ┌────────┐  ┌──────────┐
+  │Cosmos DB  │  │SharePnt│  │Eureka API│
+  │(MongoDB)  │  │(Graph) │  │(Public)  │
+  │Serverless │  │        │  │          │
+  └───────────┘  └────────┘  └──────────┘
 ```
 
 ---
 
-## Documentation
+## Po wdrożeniu
 
-- 🇵🇱 **[Polski - Quick Start](docs/QUICK_START_PL.md)** - Instrukcja krok po kroku
-- 🇬🇧 **[Full Deployment Guide](docs/DEPLOY.md)** - Detailed instructions
-- 🔐 **[Entra ID Setup](docs/ENTRA_SETUP.md)** - Authentication configuration
-- ✅ **[Post-Deployment Guide](docs/POST_DEPLOYMENT.md)** - Verification & developer workflow
-- ❓ **[FAQ](docs/FAQ.md)** - Common questions
+✅ **Deployment zakończony!**
 
----
+Po zakończeniu deployment zobaczysz outputy:
 
-## Developer Workflow
+```
+ACR Name: acreureka
+ACR Login Server: acreureka.azurecr.io
+Full Image URL: acreureka.azurecr.io/eureka-crawler:latest
+```
 
-After deployment, developer (`bartoszpalmi@hotmail.com`) can:
+**Przekaż te wartości developerowi.**
 
-### Build and deploy updates:
+### Developer może teraz:
+
+**Krok 1: Zalogować się do ACR**
 
 ```bash
-# 1. Build new version
-docker build -t registry/eureka-crawler:v1.1.0 .
-docker push registry/eureka-crawler:v1.1.0
+az acr login --name acreureka
+```
 
-# 2. Update Container Apps Jobs
-az containerapp job update \
+**Krok 2: Zbudować i zpushować pierwszy obraz**
+
+```bash
+cd ~/Projects/alto/Eureka.Crawler
+
+# Build
+docker build -t acreureka.azurecr.io/eureka-crawler:latest .
+
+# Push
+docker push acreureka.azurecr.io/eureka-crawler:latest
+```
+
+**Krok 3: Uruchomić pierwszy job**
+
+```bash
+az containerapp job start \
   --name eureka-backfill \
-  --resource-group rg-eureka-crawler \
-  --image registry/eureka-crawler:v1.1.0
-
-az containerapp job update \
-  --name eureka-delta \
-  --resource-group rg-eureka-crawler \
-  --image registry/eureka-crawler:v1.1.0
+  --resource-group rg-eureka-crawler
 ```
 
-### Monitor and troubleshoot:
-
-```bash
-# View job execution history
-az containerapp job execution list \
-  --name eureka-delta \
-  --resource-group rg-eureka-crawler \
-  --output table
-
-# View logs
-az containerapp job logs show \
-  --name eureka-delta \
-  --resource-group rg-eureka-crawler \
-  --follow
-```
+**Twoja praca jest skończona.** Developer ma automatyczny dostęp Contributor do Resource Group i może samodzielnie zarządzać aplikacją.
 
 ---
 
-## Cost Estimate
+## Koszty (szacunkowe, West Europe)
 
-**Approximate monthly costs (West Europe, 2025):**
-
-| Service | Cost/month |
-|---------|------------|
+| Serwis | Koszt/miesiąc |
+|--------|---------------|
 | Container Apps Environment | ~$50 |
-| Container Apps Jobs execution | ~$15 |
+| Container Apps Jobs | ~$15 |
 | Azure Key Vault | ~$1 |
 | Cosmos DB (Serverless) | ~$10-30* |
-| **Total** | **~$76-96** |
+| **Azure Container Registry (Basic)** | **~$5** |
+| **Total** | **~$81-101** |
 
-*Depends on data volume and request units consumed
+*Zależnie od volumenu danych i request units
 
-**Free tier:** First 180,000 vCPU-seconds/month free, first 360,000 GiB-seconds/month free
+**Free tier:** Pierwsze 180,000 vCPU-seconds/miesiąc FREE, 360,000 GiB-seconds/miesiąc FREE
 
 ---
 
-## Security
+## Bezpieczeństwo
 
-- ✅ **Zero secrets in repository** - all in Azure Key Vault
-- ✅ **Managed Identity authentication** - passwordless, Azure-managed
-- ✅ **RBAC-based access** - least privilege principle
+- ✅ **Zero sekretów w repository** - wszystko w Azure Key Vault
+- ✅ **Private container registry** - ACR Basic, obrazy nie publiczne
+- ✅ **Managed Identity authentication** - zero haseł, Azure-managed tokens
+- ✅ **RBAC least privilege** - UAMI ma tylko potrzebne role (AcrPull, Key Vault Secrets User)
 - ✅ **Soft delete enabled** - Key Vault recovery protection
-- ✅ **Automatic Cosmos DB creation** - no manual connection string management
+- ✅ **Automatic Cosmos DB creation** - zero ręcznego zarządzania connection string
 
 ---
 
-## Support
+## Licencja
 
-- **Deployment issues:** Check [docs/POST_DEPLOYMENT.md](docs/POST_DEPLOYMENT.md) troubleshooting section
-- **Application support:** Contact developer (bartoszpalmi@hotmail.com)
-- **Documentation:** See [docs/](docs/) folder
+**Copyright © 2025. Wszelkie prawa zastrzeżone.**
 
----
-
-## License
-
-**Copyright © 2025. All rights reserved.**
-
-This deployment configuration is provided as-is for reference and deployment purposes only.
-Application source code is separately licensed and not included in this repository.
+Ta konfiguracja deployment jest dostarczona "jak jest" wyłącznie do celów referencyjnych i wdrożeniowych.
+Kod źródłowy aplikacji jest licencjonowany osobno i nie jest zawarty w tym repozytorium.
 
 ---
 
-**Last Updated:** 2025-01-19
-**Compatible with:** Eureka.Crawler v1.x
-**Maintained by:** Developer Team
+**Ostatnia aktualizacja:** 2025-01-21
+**Kompatybilne z:** Eureka.Crawler v1.x
+**Utrzymywane przez:** Developer Team

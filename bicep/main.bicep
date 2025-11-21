@@ -16,18 +16,16 @@ param jobBackfillName string = 'eureka-backfill'
 @description('Name of the delta job')
 param jobDeltaName string = 'eureka-delta'
 
-@description('Container image for Eureka Crawler')
-param containerImage string
+@description('Name of the Azure Container Registry (must be globally unique, 5-50 alphanumeric characters)')
+@minLength(5)
+@maxLength(50)
+param acrName string = 'acr${uniqueString(resourceGroup().id)}'
 
-@description('Container registry server (e.g., myregistry.azurecr.io)')
-param registryServer string = ''
+@description('Container image name in ACR')
+param imageName string = 'eureka-crawler'
 
-@description('Container registry username')
-param registryUsername string = ''
-
-@description('Container registry password')
-@secure()
-param registryPassword string = ''
+@description('Container image tag')
+param imageTag string = 'latest'
 
 @description('Name of the Cosmos DB account (must be globally unique)')
 @minLength(3)
@@ -201,6 +199,31 @@ resource secretSharePointDriveId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' 
   }
 }
 
+// Azure Container Registry (Basic tier, ~$5/month)
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+  name: acrName
+  location: location
+  sku: {
+    name: 'Basic'
+  }
+  properties: {
+    adminUserEnabled: false  // Use UAMI instead of admin credentials
+    publicNetworkAccess: 'Enabled'
+    zoneRedundancy: 'Disabled'  // Basic tier doesn't support zone redundancy
+  }
+}
+
+// RBAC: UAMI gets AcrPull role on the ACR
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerRegistry.id, uami.id, 'AcrPull')
+  scope: containerRegistry
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
+    principalId: uami.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Container Apps Environment
 resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: environmentName
@@ -232,59 +255,50 @@ resource jobBackfill 'Microsoft.App/jobs@2023-05-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      registries: !empty(registryServer) ? [
+      registries: [
         {
-          server: registryServer
-          username: registryUsername
-          passwordSecretRef: 'registry-password'
+          server: containerRegistry.properties.loginServer
+          identity: uami.id  // UAMI automatic pull, NO password needed
         }
-      ] : []
-      secrets: concat(
-        [
-          {
-            name: 'cosmos-connection-string'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/cosmos-connection-string'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-tenant-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-tenant-id'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-client-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-id'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-client-secret'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-secret'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-site-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-site-id'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-drive-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-drive-id'
-            identity: uami.id
-          }
-        ],
-        !empty(registryPassword) ? [
-          {
-            name: 'registry-password'
-            value: registryPassword
-          }
-        ] : []
-      )
+      ]
+      secrets: [
+        {
+          name: 'cosmos-connection-string'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/cosmos-connection-string'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-tenant-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-tenant-id'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-client-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-id'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-client-secret'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-secret'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-site-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-site-id'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-drive-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-drive-id'
+          identity: uami.id
+        }
+      ]
     }
     template: {
       containers: [
         {
           name: 'eureka-crawler-backfill'
-          image: containerImage
+          image: '${containerRegistry.properties.loginServer}/${imageName}:${imageTag}'  // Auto-compose from ACR
           resources: {
             cpu: json(cpu)
             memory: memory
@@ -323,6 +337,7 @@ resource jobBackfill 'Microsoft.App/jobs@2023-05-01' = {
     secretSharePointClientSecret
     secretSharePointSiteId
     secretSharePointDriveId
+    acrPullRoleAssignment
   ]
 }
 
@@ -347,59 +362,50 @@ resource jobDelta 'Microsoft.App/jobs@2023-05-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      registries: !empty(registryServer) ? [
+      registries: [
         {
-          server: registryServer
-          username: registryUsername
-          passwordSecretRef: 'registry-password'
+          server: containerRegistry.properties.loginServer
+          identity: uami.id  // UAMI automatic pull, NO password needed
         }
-      ] : []
-      secrets: concat(
-        [
-          {
-            name: 'cosmos-connection-string'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/cosmos-connection-string'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-tenant-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-tenant-id'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-client-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-id'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-client-secret'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-secret'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-site-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-site-id'
-            identity: uami.id
-          }
-          {
-            name: 'sharepoint-drive-id'
-            keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-drive-id'
-            identity: uami.id
-          }
-        ],
-        !empty(registryPassword) ? [
-          {
-            name: 'registry-password'
-            value: registryPassword
-          }
-        ] : []
-      )
+      ]
+      secrets: [
+        {
+          name: 'cosmos-connection-string'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/cosmos-connection-string'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-tenant-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-tenant-id'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-client-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-id'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-client-secret'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-client-secret'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-site-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-site-id'
+          identity: uami.id
+        }
+        {
+          name: 'sharepoint-drive-id'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/sharepoint-drive-id'
+          identity: uami.id
+        }
+      ]
     }
     template: {
       containers: [
         {
           name: 'eureka-crawler-delta'
-          image: containerImage
+          image: '${containerRegistry.properties.loginServer}/${imageName}:${imageTag}'  // Auto-compose from ACR
           resources: {
             cpu: json(cpu)
             memory: memory
@@ -438,6 +444,7 @@ resource jobDelta 'Microsoft.App/jobs@2023-05-01' = {
     secretSharePointClientSecret
     secretSharePointSiteId
     secretSharePointDriveId
+    acrPullRoleAssignment
   ]
 }
 
@@ -465,3 +472,6 @@ output cosmosAccountName string = cosmosAccount.name
 output cosmosEndpoint string = cosmosAccount.properties.documentEndpoint
 output cosmosDatabaseName string = cosmosDatabase.name
 output devUserAccessGranted string = 'Contributor role assigned to ${devUserObjectId}'
+output acrName string = containerRegistry.name
+output acrLoginServer string = containerRegistry.properties.loginServer
+output fullImageUrl string = '${containerRegistry.properties.loginServer}/${imageName}:${imageTag}'
