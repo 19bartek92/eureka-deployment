@@ -144,17 +144,21 @@ Kiedy klikniesz "Deploy to Azure", wypełnij formularz:
 
 ✅ **Deployment zakończony!**
 
+> **UWAGA:** Joby zostały utworzone z **placeholder image** (publiczny testowy obraz). Developer musi zaktualizować image na właściwy po zpushowaniu do ACR.
+
 Po zakończeniu deployment zobaczysz outputy:
 
 ```
 ACR Name: acreureka
 ACR Login Server: acreureka.azurecr.io
 Full Image URL: acreureka.azurecr.io/eureka-crawler:latest
+Update Backfill Job: az containerapp job update -n eureka-backfill -g rg-eureka-crawler --image acreureka.azurecr.io/eureka-crawler:latest --registry-server acreureka.azurecr.io --registry-identity <uami-id>
+Update Delta Job: az containerapp job update -n eureka-delta -g rg-eureka-crawler --image acreureka.azurecr.io/eureka-crawler:latest --registry-server acreureka.azurecr.io --registry-identity <uami-id>
 ```
 
 **Przekaż te wartości developerowi.**
 
-### Developer może teraz:
+### Kroki dla developera:
 
 **Krok 1: Zalogować się do ACR**
 
@@ -162,7 +166,7 @@ Full Image URL: acreureka.azurecr.io/eureka-crawler:latest
 az acr login --name acreureka
 ```
 
-**Krok 2: Zbudować i zpushować pierwszy obraz**
+**Krok 2: Zbudować i zpushować obraz aplikacji**
 
 ```bash
 cd ~/Projects/alto/Eureka.Crawler
@@ -174,7 +178,25 @@ docker build -t acreureka.azurecr.io/eureka-crawler:latest .
 docker push acreureka.azurecr.io/eureka-crawler:latest
 ```
 
-**Krok 3: Uruchomić pierwszy job**
+**Krok 3: Zaktualizować joby (użyj komend z outputów deployment)**
+
+```bash
+# Skopiuj komendy "Update Backfill Job" i "Update Delta Job" z outputów
+# Uruchom obie komendy aby zmienić placeholder image na właściwy
+
+# Przykład:
+az containerapp job update -n eureka-backfill -g rg-eureka-crawler \
+  --image acreureka.azurecr.io/eureka-crawler:latest \
+  --registry-server acreureka.azurecr.io \
+  --registry-identity <uami-id>
+
+az containerapp job update -n eureka-delta -g rg-eureka-crawler \
+  --image acreureka.azurecr.io/eureka-crawler:latest \
+  --registry-server acreureka.azurecr.io \
+  --registry-identity <uami-id>
+```
+
+**Krok 4: Uruchomić pierwszy job**
 
 ```bash
 az containerapp job start \

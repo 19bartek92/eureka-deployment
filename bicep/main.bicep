@@ -251,12 +251,6 @@ resource jobBackfill 'Microsoft.App/jobs@2023-05-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      registries: [
-        {
-          server: containerRegistry.properties.loginServer
-          identity: uami.id  // UAMI automatic pull, NO password needed
-        }
-      ]
       secrets: [
         {
           name: 'cosmos-connection-string'
@@ -294,7 +288,7 @@ resource jobBackfill 'Microsoft.App/jobs@2023-05-01' = {
       containers: [
         {
           name: 'eureka-crawler-backfill'
-          image: '${containerRegistry.properties.loginServer}/${imageName}:${imageTag}'  // Auto-compose from ACR
+          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'  // Placeholder - developer will update after pushing real image
           resources: {
             cpu: json(cpu)
             memory: memory
@@ -358,12 +352,6 @@ resource jobDelta 'Microsoft.App/jobs@2023-05-01' = {
         parallelism: 1
         replicaCompletionCount: 1
       }
-      registries: [
-        {
-          server: containerRegistry.properties.loginServer
-          identity: uami.id  // UAMI automatic pull, NO password needed
-        }
-      ]
       secrets: [
         {
           name: 'cosmos-connection-string'
@@ -401,7 +389,7 @@ resource jobDelta 'Microsoft.App/jobs@2023-05-01' = {
       containers: [
         {
           name: 'eureka-crawler-delta'
-          image: '${containerRegistry.properties.loginServer}/${imageName}:${imageTag}'  // Auto-compose from ACR
+          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'  // Placeholder - developer will update after pushing real image
           resources: {
             cpu: json(cpu)
             memory: memory
@@ -471,3 +459,5 @@ output devUserAccessGranted string = 'Contributor role assigned to ${devUserObje
 output acrName string = containerRegistry.name
 output acrLoginServer string = containerRegistry.properties.loginServer
 output fullImageUrl string = '${containerRegistry.properties.loginServer}/${imageName}:${imageTag}'
+output updateJobBackfillCommand string = 'az containerapp job update -n ${jobBackfillName} -g ${resourceGroup().name} --image ${containerRegistry.properties.loginServer}/${imageName}:${imageTag} --registry-server ${containerRegistry.properties.loginServer} --registry-identity ${uami.id}'
+output updateJobDeltaCommand string = 'az containerapp job update -n ${jobDeltaName} -g ${resourceGroup().name} --image ${containerRegistry.properties.loginServer}/${imageName}:${imageTag} --registry-server ${containerRegistry.properties.loginServer} --registry-identity ${uami.id}'

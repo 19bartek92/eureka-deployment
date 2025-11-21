@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.38.5.1644",
-      "templateHash": "720140842658434480"
+      "templateHash": "14036956202504694633"
     }
   },
   "parameters": {
@@ -354,12 +354,6 @@
             "parallelism": 1,
             "replicaCompletionCount": 1
           },
-          "registries": [
-            {
-              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]",
-              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
-            }
-          ],
           "secrets": [
             {
               "name": "cosmos-connection-string",
@@ -397,7 +391,7 @@
           "containers": [
             {
               "name": "eureka-crawler-backfill",
-              "image": "[format('{0}/{1}:{2}', reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'))]",
+              "image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
               "resources": {
                 "cpu": "[json(parameters('cpu'))]",
                 "memory": "[parameters('memory')]"
@@ -490,7 +484,6 @@
       },
       "dependsOn": [
         "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'AcrPull'))]",
-        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
         "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
         "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
         "[extensionResourceId(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'Key Vault Secrets User'))]",
@@ -525,12 +518,6 @@
             "parallelism": 1,
             "replicaCompletionCount": 1
           },
-          "registries": [
-            {
-              "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer]",
-              "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName'))]"
-            }
-          ],
           "secrets": [
             {
               "name": "cosmos-connection-string",
@@ -568,7 +555,7 @@
           "containers": [
             {
               "name": "eureka-crawler-delta",
-              "image": "[format('{0}/{1}:{2}', reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'))]",
+              "image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
               "resources": {
                 "cpu": "[json(parameters('cpu'))]",
                 "memory": "[parameters('memory')]"
@@ -661,7 +648,6 @@
       },
       "dependsOn": [
         "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'AcrPull'))]",
-        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
         "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
         "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
         "[extensionResourceId(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')), 'Key Vault Secrets User'))]",
@@ -745,6 +731,14 @@
     "fullImageUrl": {
       "type": "string",
       "value": "[format('{0}/{1}:{2}', reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'))]"
+    },
+    "updateJobBackfillCommand": {
+      "type": "string",
+      "value": "[format('az containerapp job update -n {0} -g {1} --image {2}/{3}:{4} --registry-server {5} --registry-identity {6}', parameters('jobBackfillName'), resourceGroup().name, reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'), reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))]"
+    },
+    "updateJobDeltaCommand": {
+      "type": "string",
+      "value": "[format('az containerapp job update -n {0} -g {1} --image {2}/{3}:{4} --registry-server {5} --registry-identity {6}', parameters('jobDeltaName'), resourceGroup().name, reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, parameters('imageName'), parameters('imageTag'), reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('acrName')), '2023-07-01').loginServer, resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('uamiName')))]"
     }
   }
 }
