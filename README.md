@@ -101,26 +101,26 @@ Kiedy klikniesz "Deploy to Azure", wypełnij formularz:
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│           Azure Container Apps Environment              │
-│                                                          │
+│           Azure Container Apps Environment             │
+│                                                        │
 │  ┌─────────────────┐        ┌─────────────────┐        │
 │  │ Backfill Job    │        │ Delta Job       │        │
-│  │ (Ręczny)        │        │ (CRON: 4:10 UTC)│        │
-│  │ Timeout: 24h    │        │ Timeout: 1h     │        │
+│  │ (Ręczny)        │        │ CRON: 00:10 UTC)│        │
+│  │                 │        │ Timeout: 1h     │        │
 │  └────────┬────────┘        └────────┬────────┘        │
-│           │                          │                  │
-│           └──────────┬───────────────┘                  │
-│                      │                                   │
-│              ┌───────▼─────────┐                        │
-│              │ UAMI (Identity) │                        │
-│              │ - Key Vault     │                        │
-│              │ - Cosmos DB     │                        │
-│              │ - ACR Pull      │                        │
-│              └───────┬─────────┘                        │
-└──────────────────────┼──────────────────────────────────┘
+│           │                          │                 │
+│           └──────────┬───────────────┘                 │
+│                      │                                 │
+│              ┌───────▼─────────┐                       │
+│              │ UAMI (Identity) │                       │
+│              │ - Key Vault     │                       │
+│              │ - Cosmos DB     │                       │
+│              │ - ACR Pull      │                       │
+│              └───────┬─────────┘                       │
+└──────────────────────┼─────────────────────────────────┘
                        │
-        ┌──────────────┼──────────────┐
-        │              │              │
+        ┌──────────────┼─────────────┐
+        │              │             │
   ┌─────▼─────┐ ┌──────▼───────┐     │
   │   ACR     │ │  Key Vault   │     │
   │ (Private) │ │  ┌─────────┐ │     │
@@ -158,7 +158,7 @@ Update Delta Job: az containerapp job update -n eureka-delta -g rg-eureka-crawle
 
 **Przekaż te wartości developerowi.**
 
-### Kroki dla developera:
+<!-- ### Kroki dla developera:
 
 **Krok 1: Zalogować się do ACR**
 
@@ -202,11 +202,11 @@ az containerapp job update -n eureka-delta -g rg-eureka-crawler \
 az containerapp job start \
   --name eureka-backfill \
   --resource-group rg-eureka-crawler
-```
+``` -->
 
 **Twoja praca jest skończona.** Developer ma automatyczny dostęp Contributor do Resource Group i może samodzielnie zarządzać aplikacją.
 
----
+<!-- ---
 
 ## Koszty (szacunkowe, West Europe)
 
@@ -221,7 +221,7 @@ az containerapp job start \
 
 *Zależnie od volumenu danych i request units
 
-**Free tier:** Pierwsze 180,000 vCPU-seconds/miesiąc FREE, 360,000 GiB-seconds/miesiąc FREE
+**Free tier:** Pierwsze 180,000 vCPU-seconds/miesiąc FREE, 360,000 GiB-seconds/miesiąc FREE -->
 
 ---
 
@@ -247,4 +247,4 @@ Kod źródłowy aplikacji jest licencjonowany osobno i nie jest zawarty w tym re
 
 **Ostatnia aktualizacja:** 2025-01-21
 **Kompatybilne z:** Eureka.Crawler v1.x
-**Utrzymywane przez:** Developer Team
+**Utrzymywane przez:** bartoszpalmi@hotmail.com
