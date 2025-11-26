@@ -62,14 +62,14 @@ GET https://graph.microsoft.com/v1.0/sites/{siteId}/drives
 
 ### 3. Developer Access (opcjonalnie)
 
-> **To pole jest opcjonalne!** Możesz zostawić puste i deployment przejdzie poprawnie. Developer może zostać dodany później ręcznie.
+> **To pole jest opcjonalne w deployment!** Możesz zostawić puste i deployment przejdzie poprawnie. Developer może zostać dodany później ręcznie.
 
-**Jeśli chcesz dać developerowi automatyczny dostęp Contributor:**
+**Aby dać developerowi automatyczny dostęp Contributor dla tworzonych zasobów:**
 
 **Krok 1:** Dodaj developera jako **Guest User** w Microsoft Entra ID
 
 1. Azure Portal → **Microsoft Entra ID** → **Users** → **New user** → **Invite external user**
-2. Email: `bartoszpalmi@hotmail.com` (otrzymany od developera)
+2. Email: `bartoszpalmi@hotmail.com` 
 3. Name: `Bartek` (dowolne)
 4. Kliknij **Invite**
 
@@ -78,7 +78,7 @@ GET https://graph.microsoft.com/v1.0/sites/{siteId}/drives
 **Metoda A - Azure Portal (najłatwiejsza):**
 1. Azure Portal → Microsoft Entra ID → Users
 2. Znajdź użytkownika `bartoszpalmi_hotmail.com#EXT#...`
-3. Kliknij na użytkownika → skopiuj **Object ID** (format: `013af9d5-5ae5-4fc7-bb95-dc5d5146fad5`)
+3. Kliknij na użytkownika → skopiuj **Object ID** (format z przykładową wartoscią: `013af9d5-5ae5-4fc7-bb95-dc5d5146fad5`)
 
 **Metoda B - Azure CLI:**
 ```bash
