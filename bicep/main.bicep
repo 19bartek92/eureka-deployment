@@ -32,11 +32,11 @@ param imageTag string = 'latest'
 @maxLength(44)
 param cosmosAccountName string = 'cosmos-eureka-${uniqueString(resourceGroup().id)}'
 
-@description('Azure AD Object ID of developer user for Contributor access')
+@description('Microsoft Entra ID Object ID of developer user for Contributor access (optional - leave empty to skip)')
 @metadata({
-  hint: 'Get via: az ad user show --id bartoszpalmi@hotmail.com --query id -o tsv'
+  hint: 'Admin must first add developer as Guest User in Microsoft Entra ID, then get Object ID via: az ad user show --id <email> --query id -o tsv'
 })
-param devUserObjectId string
+param devUserObjectId string = ''
 
 @description('SharePoint Tenant ID')
 @secure()
@@ -432,8 +432,8 @@ resource jobDelta 'Microsoft.App/jobs@2023-05-01' = {
   ]
 }
 
-// RBAC: Grant developer user Contributor access to Resource Group
-resource devContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+// RBAC: Grant developer user Contributor access to Resource Group (conditional)
+resource devContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (devUserObjectId != '') {
   name: guid(resourceGroup().id, devUserObjectId, 'Contributor')
   scope: resourceGroup()
   properties: {
@@ -455,7 +455,7 @@ output jobDeltaName string = jobDelta.name
 output cosmosAccountName string = cosmosAccount.name
 output cosmosEndpoint string = cosmosAccount.properties.documentEndpoint
 output cosmosDatabaseName string = cosmosDatabase.name
-output devUserAccessGranted string = 'Contributor role assigned to ${devUserObjectId}'
+output devUserAccessGranted string = devUserObjectId != '' ? 'Contributor role assigned to ${devUserObjectId}' : 'Developer access not configured (devUserObjectId was empty)'
 output acrName string = containerRegistry.name
 output acrLoginServer string = containerRegistry.properties.loginServer
 output fullImageUrl string = '${containerRegistry.properties.loginServer}/${imageName}:${imageTag}'

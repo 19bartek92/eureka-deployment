@@ -1,38 +1,38 @@
-# Azure Entra ID - Setup App Registration dla SharePoint
+# Microsoft Entra ID - Setup App Registration dla SharePoint
 
-Ten przewodnik krok po kroku przeprowadzi Cię przez proces utworzenia App Registration w Azure Entra ID (dawniej Azure Active Directory), który jest wymagany do integracji aplikacji Eureka.Crawler z SharePoint przez Microsoft Graph API.
+Ten przewodnik krok po kroku przeprowadzi Cię przez proces utworzenia App Registration w Microsoft Entra ID (dawniej Azure Active Directory), który jest wymagany do integracji aplikacji Eureka.Crawler z SharePoint przez Microsoft Graph API.
 
 ---
 
 ## Przegląd
 
 **Co tworzymy:**
-- Azure Entra ID App Registration z uprawnieniami do SharePoint
+- Microsoft Entra ID App Registration z uprawnieniami do SharePoint
 - Client Secret dla uwierzytelniania daemon app
 - Application permissions (nie delegated) dla dostępu bez użytkownika
 
 **Czego potrzebujesz:**
 - Dostęp do Azure Portal (portal.azure.com)
-- Uprawnienia **Global Administrator** lub **Application Administrator** w tenant Azure AD (do nadania admin consent)
+- Uprawnienia **Global Administrator** lub **Application Administrator** w Microsoft Entra ID (do nadania admin consent)
 
 **Czas:** ~10 minut
 
 ---
 
-## Krok 1: Otwórz Azure Portal i przejdź do Azure Active Directory
+## Krok 1: Otwórz Azure Portal i przejdź do Microsoft Entra ID
 
 1. Otwórz przeglądarkę i przejdź do: [https://portal.azure.com](https://portal.azure.com)
 2. Zaloguj się swoim kontem Microsoft
-3. W lewym menu kliknij **"Azure Active Directory"**
-   - Jeśli nie widzisz w menu, użyj wyszukiwarki na górze (wpisz "Azure Active Directory")
+3. W lewym menu kliknij **"Microsoft Entra ID"**
+   - Jeśli nie widzisz w menu, użyj wyszukiwarki na górze (wpisz "Microsoft Entra ID" lub "Azure Active Directory")
 
-![Azure AD w menu](https://docs.microsoft.com/azure/active-directory/media/...)
+![Microsoft Entra ID w menu](https://docs.microsoft.com/azure/active-directory/media/...)
 
 ---
 
 ## Krok 2: Utwórz nową App Registration
 
-1. W lewym menu Azure Active Directory kliknij **"App registrations"**
+1. W lewym menu Microsoft Entra ID kliknij **"App registrations"**
 2. Kliknij przycisk **"+ New registration"** (na górze strony)
 
 ![New registration button](https://docs.microsoft.com/azure/active-directory/media/...)
@@ -45,7 +45,7 @@ Wypełnij formularz następującymi wartościami:
 
 | Pole | Wartość | Opis |
 |------|---------|------|
-| **Name** | `Eureka.Crawler.SharePoint` | Nazwa aplikacji (widoczna w Azure AD) |
+| **Name** | `Eureka.Crawler.SharePoint` | Nazwa aplikacji (widoczna w Microsoft Entra ID) |
 | **Supported account types** | **Accounts in this organizational directory only (Single tenant)** | Aplikacja działa tylko w Twoim tenant |
 | **Redirect URI** | *Zostaw puste* | Daemon app nie wymaga redirect URI |
 
@@ -147,7 +147,7 @@ Sites.ReadWrite.All         Application  ✅ Granted for [org]
 ![Admin consent granted](https://docs.microsoft.com/azure/active-directory/media/...)
 
 **Jeśli nie masz uprawnień:**
-- Skontaktuj się z administratorem Azure AD w Twojej organizacji
+- Skontaktuj się z administratorem Microsoft Entra ID w Twojej organizacji
 - Poproś o nadanie admin consent dla aplikacji `Eureka.Crawler.SharePoint`
 - Administrator może to zrobić przez ten sam przycisk "Grant admin consent"
 
@@ -180,7 +180,7 @@ Teraz przejdź do: **[SETUP_SHAREPOINT.md](SETUP_SHAREPOINT.md)** - Znajdź Site
 ### Problem: "You don't have permissions to create App Registration"
 
 **Rozwiązanie:**
-- Potrzebujesz roli **Application Developer** w Azure AD
+- Potrzebujesz roli **Application Developer** w Microsoft Entra ID
 - Poproś administratora o nadanie tej roli lub utworzenie App Registration za Ciebie
 
 ### Problem: "Grant admin consent" button is disabled
@@ -208,7 +208,7 @@ Teraz przejdź do: **[SETUP_SHAREPOINT.md](SETUP_SHAREPOINT.md)** - Znajdź Site
 ## Dodatkowe zasoby
 
 - 📖 [Microsoft Graph permissions reference](https://learn.microsoft.com/graph/permissions-reference)
-- 📖 [Register an application with Azure AD](https://learn.microsoft.com/azure/active-directory/develop/quickstart-register-app)
+- 📖 [Register an application with Microsoft Entra ID](https://learn.microsoft.com/entra/identity-platform/quickstart-register-app)
 - 📖 [Application vs Delegated permissions](https://learn.microsoft.com/azure/active-directory/develop/v2-permissions-and-consent#permission-types)
 
 ---

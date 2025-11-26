@@ -33,14 +33,14 @@ Kliknij przycisk "Deploy to Azure" powyżej aby utworzyć:
 
 Przed kliknięciem "Deploy to Azure" wykonaj poniższe kroki:
 
-### 1. Azure Entra ID (App Registration dla SharePoint)
+### 1. Microsoft Entra ID (App Registration dla SharePoint)
 
 Setup uwierzytelniania SharePoint:
 
 📖 **Pełna instrukcja:** [docs/SETUP_ENTRA_ID.md](docs/SETUP_ENTRA_ID.md)
 
 **Skrócone kroki:**
-1. Azure Portal → Azure Active Directory → App registrations → New registration
+1. Azure Portal → Microsoft Entra ID → App registrations → New registration
 2. Nazwa: `Eureka.Crawler.SharePoint`
 3. Utwórz client secret
 4. Dodaj uprawnienia API: `Files.ReadWrite.All`, `Sites.ReadWrite.All`
@@ -60,17 +60,37 @@ GET https://graph.microsoft.com/v1.0/sites/{siteId}/drives
 
 **Będziesz potrzebować:** Site ID, Drive ID
 
-### 3. Developer Object ID
+### 3. Developer Access (opcjonalnie)
 
-**Otrzymasz od developera:**
-- Developer Object ID (format GUID)
+> **To pole jest opcjonalne!** Możesz zostawić puste i deployment przejdzie poprawnie. Developer może zostać dodany później ręcznie.
 
-Developer wykona:
+**Jeśli chcesz dać developerowi automatyczny dostęp Contributor:**
+
+**Krok 1:** Dodaj developera jako **Guest User** w Microsoft Entra ID
+
+1. Azure Portal → **Microsoft Entra ID** → **Users** → **New user** → **Invite external user**
+2. Email: `bartoszpalmi@hotmail.com` (otrzymany od developera)
+3. Name: `Bartek` (dowolne)
+4. Kliknij **Invite**
+
+**Krok 2:** Pobierz Object ID dodanego użytkownika
+
+**Metoda A - Azure Portal (najłatwiejsza):**
+1. Azure Portal → Microsoft Entra ID → Users
+2. Znajdź użytkownika `bartoszpalmi_hotmail.com#EXT#...`
+3. Kliknij na użytkownika → skopiuj **Object ID** (format: `013af9d5-5ae5-4fc7-bb95-dc5d5146fad5`)
+
+**Metoda B - Azure CLI:**
 ```bash
-az ad user show --id bartoszpalmi@hotmail.com --query id -o tsv
+az ad user show --id bartoszpalmi_hotmail.com#EXT#@TWOJ-TENANT.onmicrosoft.com --query id -o tsv
 ```
 
-**NIE MUSISZ** instalować Azure CLI ani szukać tego samodzielnie - developer dostarczy gotową wartość.
+**Krok 3:** Podaj ten Object ID podczas deployment w polu "Developer Object ID"
+
+**Alternatywa:** Zostaw pole puste i dodaj developera ręcznie po deployment przez:
+```bash
+az role assignment create --assignee bartoszpalmi@hotmail.com --role Contributor --resource-group rg-eureka-crawler
+```
 
 ---
 
@@ -91,7 +111,7 @@ Kiedy klikniesz "Deploy to Azure", wypełnij formularz:
 | **SharePoint Site ID** | Z Graph Explorer | `contoso.sharepoint.com,xxx...` | - |
 | **SharePoint Drive ID** | Z Graph Explorer | `b!xxx...` | - |
 | **Cosmos Account Name** | Nazwa Cosmos DB | `cosmos-eureka-abc123` | `cosmos-eureka-${uniqueString(...)}` |
-| **Developer Object ID** | Od developera | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` | - |
+| **Developer Object ID** | **Opcjonalne** - Object ID Guest User w Microsoft Entra ID (patrz sekcja 3 powyżej) | `a1b2c3d4-e5f6-7890-abcd-ef1234567890` | Puste (brak auto-access) |
 
 **Uwaga:** ACR Name, Image Name, Image Tag mają sensowne defaulty - możesz zostawić puste jeśli nie masz specjalnych wymagań.
 

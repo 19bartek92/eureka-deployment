@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.38.5.1644",
-      "templateHash": "14036956202504694633"
+      "templateHash": "6551678449436980399"
     }
   },
   "parameters": {
@@ -85,9 +85,10 @@
     },
     "devUserObjectId": {
       "type": "string",
+      "defaultValue": "",
       "metadata": {
-        "hint": "Get via: az ad user show --id bartoszpalmi@hotmail.com --query id -o tsv",
-        "description": "Azure AD Object ID of developer user for Contributor access"
+        "hint": "Admin must first add developer as Guest User in Microsoft Entra ID, then get Object ID via: az ad user show --id <email> --query id -o tsv",
+        "description": "Microsoft Entra ID Object ID of developer user for Contributor access (optional - leave empty to skip)"
       }
     },
     "sharePointTenantId": {
@@ -661,6 +662,7 @@
       ]
     },
     {
+      "condition": "[not(equals(parameters('devUserObjectId'), ''))]",
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
       "name": "[guid(resourceGroup().id, parameters('devUserObjectId'), 'Contributor')]",
@@ -718,7 +720,7 @@
     },
     "devUserAccessGranted": {
       "type": "string",
-      "value": "[format('Contributor role assigned to {0}', parameters('devUserObjectId'))]"
+      "value": "[if(not(equals(parameters('devUserObjectId'), '')), format('Contributor role assigned to {0}', parameters('devUserObjectId')), 'Developer access not configured (devUserObjectId was empty)')]"
     },
     "acrName": {
       "type": "string",
